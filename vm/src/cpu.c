@@ -2,6 +2,7 @@
 #include <stdlib.h>
 
 #include "mem.h"
+#include "tty.h"
 
 static ui64 PC = 0;
 static ui64 registers[8];
@@ -12,7 +13,7 @@ static ui8 PWD = 0;
 #define get_ins()      mem_read(PC, byte)
 #define get_next_ins() mem_read(PC++, byte)
 
-static void chpwd_cmp(byte args) {
+static inline void chpwd_cmp(byte args) {
     ui64 m, n;
     n = reg_of(args);
     m = registers[args >> 3];
@@ -21,7 +22,14 @@ static void chpwd_cmp(byte args) {
     if (m>n)  PWD |= 0x1;
 }
 
-static void _binop(byte ins, byte args) {
+static inline ui64 _read_imm(byte len) {
+    ui64 imm = 0;
+    while(len--)
+        imm |= get_next_ins() << (len*8);
+    return imm;
+}
+
+static inline void _binop(byte ins, byte args) {
     ui64 m, n;
     n = reg_of(args);
     m = registers[args >> 3];
@@ -53,7 +61,28 @@ static void _binop(byte ins, byte args) {
     }
 }
 
+static inline void _mov(byte ins, byte arg) {
+    ui64 imm = 0;
+    size_t len = 4 << (arg & 0x07);
+    if (arg & 0x04) { /* using Imm */
+        len >>= 6; 
+        imm = _read_imm(len);
+        if (ins & 0x08) { /* write */
+            mem_write_p(reg_of(arg >> 3), &imm, ui64);
+        } else { /* read */
+            reg_of(ins) = *(ui64*) mem_read_n(imm, len);
+        }
+    } else { /* using registers */
+        if (ins & 0x08) { /* write */
+            mem_write_n(reg_of(arg >> 3), &reg_of(arg), len);
+        } else { /* read */
+            reg_of(ins) = *(ui64*) mem_read_n(reg_of(arg >> 3), len);
+        }
+    }
+}
+
 static void mainloop() {
+    ui64 imm;
     byte ins;
     while(1) {
 loop:
@@ -69,13 +98,21 @@ loop:
                 goto binop;
             case 2:
                 if(ins & 0x20) goto cmp;
-                if(ins & 0x10) goto mov;
-                          else goto io; 
-            default:
-                goto error;
+                if(ins & 0x10) goto io;
+                          else goto mov; 
+            case 3:
+                goto regop;
         } /* router end */
     }
 /* sub routers */
+regop:
+    if (ins & 0x08) { /* reg-set */
+        imm = _read_imm(get_next_ins() & 0x07);
+        reg_of(ins) = imm;
+    } else { /* reg-copy */
+        reg_of(ins) = reg_of(get_next_ins());
+    }
+    goto loop;
 sop:
     if ((ins & 0x18) == 1) {
         reg_of(ins) = !reg_of(ins);
@@ -90,24 +127,37 @@ cmp:
     chpwd_cmp(get_next_ins());
     goto loop;
 jump:
-    if ((ins & 0x7) & PWD)
+    if ((ins & 0x07) & PWD)
         PC = reg_of(get_next_ins());
     goto loop;
 mov:
+    
+    _mov(ins, get_next_ins());
     goto loop;
 io:
+    if (ins & 0x08) { /* write to divices */
+        tty_write_byte(reg_of(ins) & 0xFF); 
+    } else { /* read from devices */
+        reg_of(ins) = getchar();
+    }
     goto loop;
-halt:
 #if(defined(TCVM_DEBUG_CPU))
+halt:
     puts("halt.");
-#endif
+    exit(0);
+error:
+    printf("ERROR: Unknown instruction 0x%X\n", ins);
+    exit(-2);
+#else
+halt:
     exit(0);
 error:
     exit(-2);
+#endif
 }
 
 int main() {
-    byte i = 0x1;
-    mem_write_p(0, &i, byte);
+    byte code[] = { 0xC8, 0x01, 'A', 0xC9, 0x01, '\n', 0x98, 0x99, 0x01 };
+    mem_load_bytes(code, 9);
     mainloop();
 }
