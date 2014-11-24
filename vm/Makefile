@@ -1,7 +1,7 @@
 CFLAGS=-g -Iinclude -Wall
 vpath %.c src
 
-cpu: cpu.c mem.c
+cpu: cpu.c mem.c tty.c
 	$(CC) $(CFLAGS) -DTCVM_DEBUG_CPU $^
 
 mem: mem.c
