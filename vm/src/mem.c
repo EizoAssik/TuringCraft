@@ -7,13 +7,17 @@
 #include "common.h"
 #include "mem.h"
 
+#if(defined(TCVM_DEBUG_MEM))
 static ui64       mem_bitmaps [MEM_PAGES];
+#endif
 static memblock * mem_blocks  [MEM_PAGES];
+static byte       zero_buffer [sizeof(ui64)];
 
 static memblock * block_alloc() {
    memblock * bk = NULL;
    bk = (memblock *) calloc(1, sizeof(memblock));
    bk->mem = calloc(CELL_SIZE, MEM_CELLS);
+   assert(bk);
    return bk;
 }
 
@@ -43,7 +47,11 @@ static inline memblock * get_block(i32 addr) {
 }
 
 static inline void * phy_addr(ui64 addr) {
-    return get_block(addr)->mem + (addr & 0xFF);
+    return get_block(addr)->mem + (addr & 0xFFF);
+}
+
+static inline ui32 _mem_get_block_addr(ui32 addr) {
+    return addr >> 12;
 }
 
 static bool in_memory(i32 addr) {
@@ -52,17 +60,24 @@ static bool in_memory(i32 addr) {
 }
 
 void * _mem_read(ui32 addr, size_t size) {
-    assert(in_memory(addr));
+    assert_valid_addr(addr);
+    if (!in_memory(addr)) /* if not in memory, then must be 0 */
+        return (void *) zero_buffer;
     return phy_addr(addr);
 }
 
 void _mem_write_p(ui32 addr, byte * datap, size_t size) {
-    if (not in_memory(addr)) {
-        mem_blocks[addr>>12] = block_alloc();
+    assert_valid_addr(addr);
+    ui32 block_addr = _mem_get_block_addr(addr);
+    if (!mem_blocks[block_addr]) {
+        mem_blocks[block_addr] = block_alloc();
     }
     byte * paddr = (byte *) phy_addr(addr);
     while(size--)
         *paddr++ = *datap++;
+#if(defined(TCVM_DEBUG_MEM))
+    mem_bitmaps[block_addr] |= (addr >> 6) & 0x3F;
+#endif
 }
 
 #if(defined(TCVM_DEBUG_MEM))

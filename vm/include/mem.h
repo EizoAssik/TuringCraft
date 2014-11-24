@@ -19,11 +19,19 @@ typedef struct {
 
 void * _mem_read(ui32 addr, size_t size);
 void _mem_write_p(ui32 addr, byte * datap, size_t size);
+#define mem_load_bytes(datap, len) \
+   _mem_write_p(0, datap, len)
 
 #define mem_read(addr, type) \
     (*((type*)_mem_read(addr, sizeof(type))))
 
+#define mem_read_n(addr, n) \
+    _mem_read(addr, n)
+
 #define mem_write_p(addr, datap, type) \
    _mem_write_p(addr, datap, sizeof(type))
+
+#define mem_write_n(addr, datap, n) \
+   _mem_write_p(addr, datap, n)
 
 #endif
