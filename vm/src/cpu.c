@@ -29,30 +29,27 @@ static inline ui64 _read_imm(byte len) {
     return imm;
 }
 
-static inline void _binop(byte ins, byte args) {
-    ui64 m, n;
-    n = reg_of(args);
-    m = registers[args >> 3];
+static inline void _binop(byte ins, byte arg) {
     if (ins & 0x20) {
         switch ((ins >> 3) & 0x3) {
-            case 0: reg_of(m) %= reg_of(n); break;
+            case 0: reg_of(arg>>3) %= reg_of(arg); break;
             case 1:
                     if ((ins & 0x7) == 1) {
-                        reg_of(m) >>= reg_of(n);
+                        reg_of(arg>>3) >>= reg_of(arg);
                     } else {
-                        reg_of(m) <<= reg_of(n);
+                        reg_of(arg>>3) <<= reg_of(arg);
                     }
                     break;
-            case 2: reg_of(m) &= reg_of(n); break;
-            case 3: reg_of(m) |= reg_of(n); break;
+            case 2: reg_of(arg>>3) &= reg_of(arg); break;
+            case 3: reg_of(arg>>3) |= reg_of(arg); break;
         }
     } else {
         if (ins & 0x1) { /* integers, with out checking sign */
             switch ((ins >> 3) & 0x3) {
-                case 0: reg_of(m) += reg_of(n); break;
-                case 1: reg_of(m) -= reg_of(n); break;
-                case 2: reg_of(m) *= reg_of(n); break;
-                case 3: reg_of(m) /= reg_of(n); break;
+                case 0: reg_of(arg>>3) += reg_of(arg); break;
+                case 1: reg_of(arg>>3) -= reg_of(arg); break;
+                case 2: reg_of(arg>>3) *= reg_of(arg); break;
+                case 3: reg_of(arg>>3) /= reg_of(arg); break;
             }
         } else { /* floats */
             /* forget it */
@@ -157,7 +154,14 @@ error:
 }
 
 int main() {
-    byte code[] = { 0xC8, 0x01, 'A', 0xC9, 0x01, '\n', 0x98, 0x99, 0x01 };
-    mem_load_bytes(code, 9);
+    byte code[] = {
+        0xC8, 0x01, 'A',
+        0xCA, 0x01, 0x01,
+        0x41, 0x02,
+        0xC9, 0x01, '\n',
+        0x98,
+        0x99,
+        0x01 };
+    mem_load_bytes(code, sizeof(code)/sizeof(byte));
     mainloop();
 }
