@@ -38,10 +38,13 @@ TuringCraft的虚拟机TCMachine包括：
     01111|--- -- REG REG |         must be integers
     -----+-------------------
     10100|--- -- REG REG CMP       100 010 001 < = >
-    10000|--- -- REG SET READ-MEM
-    10001|--- -- REG SET SEND-MEM
-    10010|--- -- REG SET READ-DEV
-    10011|--- -- REG SET SEND-DEV
+    10000|REG -- REG SET READ-MEM  0,1,2,3->reg 4,5,6,7->Imm
+    10001|REG -- REG SET SEND-MEM
+    10010|REG -- REG SET READ-DEV
+    10011|REG -- REG SET SEND-DEV
+    -----+-------------------
+    11000|REG -- --- REG REG-COPY
+    11001|REG -- --- SET REG-SET 
 
     PWD, 8-bits:
     -|-|-|-|-|L|E|G
