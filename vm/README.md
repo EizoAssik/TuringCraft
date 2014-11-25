@@ -37,8 +37,8 @@ TuringCraft的虚拟机TCMachine包括：
     01110|--- -- REG REG &         must be integers
     01111|--- -- REG REG |         must be integers
     -----+-------------------
-    10100|--- -- REG REG CMP       100 010 001 < = >
-    10000|REG -- REG SET READ-MEM  0,1,2,3->reg 4,5,6,7->Imm
+    10100|--- -- REG REG CMP       
+    10000|REG -- REG SET READ-MEM  SET: 0,1,2,3->reg 4,5,6,7->Imm
     10001|REG -- REG SET SEND-MEM
     10010|REG -- REG SET READ-DEV
     10011|REG -- REG SET SEND-DEV
