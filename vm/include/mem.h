@@ -29,9 +29,10 @@ void _mem_write_p(ui32 addr, byte * datap, size_t size);
     _mem_read(addr, n)
 
 #define mem_write_p(addr, datap, type) \
-   _mem_write_p(addr, datap, sizeof(type))
+   _mem_write_p(addr, (byte*)datap, sizeof(type))
 
 #define mem_write_n(addr, datap, n) \
-   _mem_write_p(addr, datap, n)
+   _mem_write_p(addr, (byte*)datap, n)
+void mem_free();
 
 #endif
