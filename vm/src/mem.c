@@ -28,12 +28,14 @@ static void block_free(memblock * block) {
     }
 }
 
+#if(defined(TCVM_DEBUG_MEM))
 static void block_safe_free(memblock * block) {
     if (block && !(block->bitmap) && !(block->mem)) {
         free(block->mem);
         free(block);
     }
 }
+#endif
 
 /* 64 MB memory need 26 bit address.
  * |<14-bits>+<6-bits>+<6-bits>|
@@ -78,6 +80,11 @@ void _mem_write_p(ui32 addr, byte * datap, size_t size) {
 #if(defined(TCVM_DEBUG_MEM))
     mem_bitmaps[block_addr] |= (addr >> 6) & 0x3F;
 #endif
+}
+
+void mem_free() {
+    for(i32 i = 0; i<MEM_PAGES; i++)
+        block_free(mem_blocks[i]);
 }
 
 #if(defined(TCVM_DEBUG_MEM))
