@@ -65,7 +65,7 @@ static inline void _mov(byte ins, byte arg) {
         len >>= 6; 
         imm = _read_imm(len);
         if (ins & 0x08) { /* write */
-            mem_write_p(reg_of(arg >> 3), &imm, ui64);
+            mem_write_p(reg_of(arg >> 3), imm, ui64);
         } else { /* read */
             reg_of(ins) = *(ui64*) mem_read_n(imm, len);
         }
@@ -87,9 +87,9 @@ loop:
         /* First router */
         switch(ins >> 6) {
             case 0:
-                if(ins & 0x01) goto halt;
-                if(ins & 0x08) goto jump;
-                if(ins & 0x20) goto sop;
+                if(ins == 0x01) goto halt;
+                if(ins &  0x08) goto jump;
+                if(ins &  0x20) goto sop;
                 break;
             case 1:
                 goto binop;
@@ -104,7 +104,7 @@ loop:
 /* sub routers */
 regop:
     if (ins & 0x08) { /* reg-set */
-        imm = _read_imm(get_next_ins() & 0x07);
+        imm = _read_imm(get_next_ins());
         reg_of(ins) = imm;
     } else { /* reg-copy */
         reg_of(ins) = reg_of(get_next_ins());
@@ -128,7 +128,6 @@ jump:
         PC = reg_of(get_next_ins());
     goto loop;
 mov:
-    
     _mov(ins, get_next_ins());
     goto loop;
 io:
@@ -153,15 +152,36 @@ error:
 #endif
 }
 
-int main() {
+int main(int argc, char *argv[]) {
+    /* print "Hello World!\n" if not given any image  */
     byte code[] = {
-        0xC8, 0x01, 'A',
-        0xCA, 0x01, 0x01,
-        0x41, 0x02,
-        0xC9, 0x01, '\n',
-        0x98,
-        0x99,
-        0x01 };
-    mem_load_bytes(code, sizeof(code)/sizeof(byte));
+        0xCC, 0x01, 0x01, /* EX <- 1 */
+        0xCD, 0x01, 0x0F, /* FX <- &(loop) */
+        0xCE, 0x01, 0x19, /* GX <- &(halt) */
+        0xC8, 0x01, 0x1A, /* AX <- &'H' 26  */
+        0xC9, 0x01, 0x28, /* BX <- &'\n' */
+        0xA0, 0x01,       /* CMP AX, BX  */
+        0x09, 0x06,       /* AX > BX -> goto halt */
+        0x82, 0x00,       /* CX <- $(AX) */
+        0x41, 0x04,       /* AX += EX */ 
+        0x9A,             /* PRINT */
+        0x0F, 0x05,       /* goto loop */
+        0x01,
+        'H', 'e', 'l', 'l', 'o', ',', ' ', 'w', 'o', 'r', 'l', 'd', '!', '\n'
+    };
+    FILE * img = NULL;
+    byte * bootstrap = NULL;
+    size_t img_size = 0;
+    if (argc == 2) {
+        img = fopen(argv[1], "rb");
+        fseek(img, 0, SEEK_END);
+        img_size = ftell(img);
+        bootstrap = (byte *) malloc(img_size);
+        fseek(img, 0, SEEK_SET);
+        fread(bootstrap, sizeof(byte), img_size, img);
+        mem_load_bytes(bootstrap, img_size);
+    } else {
+        mem_load_bytes(code, sizeof(code)/sizeof(byte));
+    }
     mainloop();
 }
