@@ -1,50 +1,53 @@
 TuringCraft - VM
 ================
 
-TuringCraft的虚拟机TCMachine包括：
+TuringCraft世界的虚拟机是一台很不科学的机器。它有着毫无逻辑的指令集和不合常理的硬件设置。开机，停机，天空有骆驼飞过。
 
-+   8KB BOOTLOADER
-+  64MB RAM
-+ 128MB STORAGE, mapped in memory at high address.
-+   1   64-bit CPU
-+   1   KEYBOARD
-+   1   TTY
+TuringCraft的虚拟机TCVM包括：
 
-其中，CPU详细定义如下
++  8KB BOOTLOADER
++ 64MB RAM
++ 16MB HDD (not yet)
++  1   64-bit CPU
++  1   KEYBOARD
++  1   TTY
 
-+ 8 64-bit register: A-H, X: 64-bit, H/L: 32-bit
-+ 1 PC register
-+ 1 PWD register
-+ 1 instruction per cycle
-+ 1 or 2 byte per instruction
-+ NO ANY MEMORY MANAGING SUPPORT
-    <-指令|设置-><-第1操作数|第2操作数->
-    +-*/%<<>>&|!~
-    IORWJHN
-    00000|000 -- --- --- NOP
-    00000|001 -- --- --- HALT
-    00001|SET -- --- REG JUMP      100 010 001 < = >, 可加, 000 -> NOP, 111 -> JMP
-    -----+-------------------
-    00101|REG -- --- --- NOT
-    00110|REG -- --- --- REV
-    -----+-------------------
-    01000|SET -- REG REG +         1S0 0S1 float integer, S -> singled
-    01001|SET -- REG REG -         1S0 0S1 float integer
-    01010|SET -- REG REG *         1S0 0S1 float integer 
-    01011|SET -- REG REG /         1S0 0S1 float integer        
-    01100|--- -- REG REG %         must be integers
-    01101|SET -- REG REG <<>>      100 001 << >>, logical
-    01110|--- -- REG REG &         must be integers
-    01111|--- -- REG REG |         must be integers
-    -----+-------------------
-    10100|--- -- REG REG CMP       
-    10000|REG -- REG SET READ-MEM  SET: 0,1,2,3->reg 4,5,6,7->Imm
-    10001|REG -- REG SET SEND-MEM
-    10010|REG -- REG SET READ-DEV
-    10011|REG -- REG SET SEND-DEV
-    -----+-------------------
-    11000|REG -- --- REG REG-COPY
-    11001|REG -- --- SET REG-SET 
+其中，TCVM的CPU描述如下：
 
-    PWD, 8-bits:
-    -|-|-|-|-|L|E|G
++ 8x 64位通用寄存器   A-H
++ 1x 程序计数器(PC)   仅能通过JUMP指令修改
++ 1x 程序状态字(PWD)  执行比较指令时修改
++ 1x 指令/周期
++ 不提供任何内存抽象
+
+## TCVM 机器语言
+
+>   格式: <-指令|设置->[<-第1操作数|第2操作数->]
+>   00000|000 -- --- --- NOP       空操作
+>   00000|001 -- --- --- HALT      停机，程序必须已HALT结束
+>   00001|SET -- --- REG JUMP     \<, =, \> 一次标记为 4,2,1, 可加, 0x7恒跳转
+>   -----+-------------------
+>   00101|REG -- --- --- NOT       逻辑非
+>   00110|REG -- --- --- REV       按位取反
+>   -----+-------------------
+>   01000|FSI -- REG REG +         FSI，S标记是否使用符号位，F/I标记浮点/整数，下同
+>   01001|FSI -- REG REG -         
+>   01010|FSI -- REG REG *          
+>   01011|FSI -- REG REG /                 
+>   01100|--- -- REG REG %         寄存器中的值被理解为整数 
+>   01101|SET -- REG REG SHIFT     逻辑位移，100/001标示左移/右移
+>   01110|--- -- REG REG &         必须为整数 
+>   01111|--- -- REG REG |         必须为整数
+>   -----+-------------------
+>   10100|--- -- REG REG CMP       
+>   10000|REG -- REG WTH READ-MEM WTH%4标记宽度 0/1/2/3标示8/16/32/64位
+>   10001|REG -- REG WTH SEND-MEM WTH小于4使用寄存器，否则使用立即数
+>   10010|REG -- REG WTH READ-DEV
+>   10011|REG -- REG WTH SEND-DEV
+>   -----+-------------------
+>   11000|REG -- --- REG REG-COPY
+>   11001|REG -- --- WTH REG-SET 
+
+>    PWD 目前仅使用低3位，标记比较结果
+>    -|-|-|-|-|L|E|G
+>    立即数按照字节序列写入指令流
