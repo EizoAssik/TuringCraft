@@ -39,6 +39,7 @@ int main(int argc, char *argv[]) {
         /* print "Hello World!\n" if not given any image  */
         mem_load_bytes(code, sizeof(code)/sizeof(byte));
     }
+    cpu_init();
     mainloop();
     mem_free();
 }

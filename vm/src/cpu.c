@@ -5,19 +5,22 @@
 #include "tty.h"
 #include "cpu.h"
 
+#define TCVM_CPU_REGISTERS 8
+
 static ui64 PC = 0;
-static ui64 registers[8];
+static void * registers[TCVM_CPU_REGISTERS];
 static ui8 PWD = 0;
 
-#define reg_of(ins) (registers[ins&0x07])
+#define ins_in_reg(ins) (*((byte *)(registers[ins&0x07])))
+#define reg_of(ins, type) (*((type *)(registers[ins&0x07])))
 
 #define get_ins()      mem_read(PC, byte)
 #define get_next_ins() mem_read(PC++, byte)
 
 static inline void chpwd_cmp(byte args) {
     ui64 m, n;
-    n = reg_of(args);
-    m = registers[args >> 3];
+    n = reg_of(args, ui64);
+    m = reg_of(args >> 3, ui64);
     if (m<n)  PWD |= 0x4;
     if (m==n) PWD |= 0x2;
     if (m>n)  PWD |= 0x1;
@@ -33,28 +36,39 @@ static inline ui64 _read_imm(byte len) {
 static inline void _binop(byte ins, byte arg) {
     if (ins & 0x20) {
         switch ((ins >> 3) & 0x3) {
-            case 0: reg_of(arg>>3) %= reg_of(arg); break;
+            case 0: reg_of(arg>>3, ui64) %= reg_of(arg, ui64); break;
             case 1:
                     if ((ins & 0x7) == 1) {
-                        reg_of(arg>>3) >>= reg_of(arg);
+                        reg_of(arg>>3, ui64) >>= reg_of(arg, ui64);
                     } else {
-                        reg_of(arg>>3) <<= reg_of(arg);
+                        reg_of(arg>>3, ui64) <<= reg_of(arg, ui64);
                     }
                     break;
-            case 2: reg_of(arg>>3) &= reg_of(arg); break;
-            case 3: reg_of(arg>>3) |= reg_of(arg); break;
+            case 2: reg_of(arg>>3, ui64) &= reg_of(arg, ui64); break;
+            case 3: reg_of(arg>>3, ui64) |= reg_of(arg, ui64); break;
         }
     } else {
-        if (ins & 0x1) { /* integers, with out checking sign */
+        if ((ins & 0x7) == 0x1) { /* integers, unsigned */
             switch ((ins >> 3) & 0x3) {
-                case 0: reg_of(arg>>3) += reg_of(arg); break;
-                case 1: reg_of(arg>>3) -= reg_of(arg); break;
-                case 2: reg_of(arg>>3) *= reg_of(arg); break;
-                case 3: reg_of(arg>>3) /= reg_of(arg); break;
+                case 0: reg_of(arg>>3, ui64) += reg_of(arg, ui64); break;
+                case 1: reg_of(arg>>3, ui64) -= reg_of(arg, ui64); break;
+                case 2: reg_of(arg>>3, ui64) *= reg_of(arg, ui64); break;
+                case 3: reg_of(arg>>3, ui64) /= reg_of(arg, ui64); break;
             }
-        } else { /* floats */
-            /* forget it */
-            exit(233);
+        } else if ((ins & 0x7) == 0x3) { /* integers, signed */
+            switch ((ins >> 3) & 0x3) {
+                case 0: reg_of(arg>>3, i64) += reg_of(arg, i64); break;
+                case 1: reg_of(arg>>3, i64) -= reg_of(arg, i64); break;
+                case 2: reg_of(arg>>3, i64) *= reg_of(arg, i64); break;
+                case 3: reg_of(arg>>3, i64) /= reg_of(arg, i64); break;
+            }
+        } else { /* floats must be signed */
+            switch ((ins >> 3) & 0x3) {
+                case 0: reg_of(arg>>3, f64) += reg_of(arg, f64); break;
+                case 1: reg_of(arg>>3, f64) -= reg_of(arg, f64); break;
+                case 2: reg_of(arg>>3, f64) *= reg_of(arg, f64); break;
+                case 3: reg_of(arg>>3, f64) /= reg_of(arg, f64); break;
+            }
         }
     }
 }
@@ -66,15 +80,15 @@ static inline void _mov(byte ins, byte arg) {
         len >>= 6; 
         imm = _read_imm(len);
         if (ins & 0x08) { /* write */
-            mem_write_p(reg_of(arg >> 3), imm, ui64);
+            mem_write_p(reg_of(arg >> 3, ui64), imm, ui64);
         } else { /* read */
-            reg_of(ins) = *(ui64*) mem_read_n(imm, len);
+            reg_of(ins, ui64) = *(ui64*) mem_read_n(imm, len);
         }
     } else { /* using registers */
         if (ins & 0x08) { /* write */
-            mem_write_n(reg_of(arg >> 3), &reg_of(arg), len);
+            mem_write_n(reg_of(arg >> 3, ui64), &reg_of(arg, ui64), len);
         } else { /* read */
-            reg_of(ins) = *(ui64*) mem_read_n(reg_of(arg >> 3), len);
+            reg_of(ins, ui64) = *(ui64*) mem_read_n(reg_of(arg >> 3, ui64), len);
         }
     }
 }
@@ -107,16 +121,16 @@ loop:
 regop:
     if (ins & 0x08) { /* reg-set */
         imm = _read_imm(get_next_ins());
-        reg_of(ins) = imm;
+        reg_of(ins, ui64) = imm;
     } else { /* reg-copy */
-        reg_of(ins) = reg_of(get_next_ins());
+        reg_of(ins, ui64) = reg_of(get_next_ins(), ui64);
     }
     goto loop;
 sop:
     if ((ins & 0x18) == 1) {
-        reg_of(ins) = !reg_of(ins);
+        reg_of(ins, ui64) = !reg_of(ins, ui64);
     } else {
-        reg_of(ins) = ~reg_of(ins);
+        reg_of(ins, ui64) = ~reg_of(ins, ui64);
     }
     goto loop;
 binop:
@@ -127,7 +141,7 @@ cmp:
     goto loop;
 jump:
     if ((ins & 0x07) & PWD)
-        PC = reg_of(get_next_ins());
+        PC = reg_of(get_next_ins(), ui64);
     else
         PC++;
     goto loop;
@@ -136,9 +150,9 @@ mov:
     goto loop;
 io:
     if (ins & 0x08) { /* write to divices */
-        tty_write_byte(reg_of(ins) & 0xFF); 
+        tty_write_byte(reg_of(ins, ui64) & 0xFF); 
     } else { /* read from devices */
-        reg_of(ins) = getchar();
+        reg_of(ins, ui64) = getchar();
     }
     goto loop;
 #if(defined(TCVM_DEBUG_CPU))
@@ -155,3 +169,11 @@ error:
     exit(-2);
 #endif
 }
+
+void cpu_init() {
+    /* 随机初始化 */
+    for (int i = 0; i != TCVM_CPU_REGISTERS; i++) {
+        registers[i] = malloc(sizeof(ui64));
+    }
+}
+
