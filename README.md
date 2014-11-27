@@ -13,5 +13,4 @@ TuringCraft（下简称TC）是一个意外混合了诸多创意的沙盒游戏�
 当前工作于：
 
 + 同步PWD
-+ 浮点运算
 + 虚拟磁盘&BOOTLOADER
